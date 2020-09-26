@@ -1,22 +1,39 @@
+"""
+This module's type annotations assume you use python3.7+: https://www.python.org/dev/peps/pep-0563
+"""
+from __future__ import annotations
+
 import numpy as np
-from typing import Union
+from typing import Callable, List, Set, Union, Tuple
 
 
 class Value:
-    """ stores a single scalar value and its gradient """
+    """ Stores a single scalar value and its gradient """
 
-    def __init__(self, data, _children=(), _op=""):
+    data: float
+    grad: float
+
+    # Internal variables used for autograd graph construction
+    _backward: Callable
+    _prev: Set
+    _op: str
+
+    def __init__(self, data: float, children: Tuple = (), op: str = ""):
         self.data = data
         self.grad = 0
-        # internal variables used for autograd graph construction
+
         self._backward = lambda: None
-        self._prev = set(_children)
-        self._op = _op  # the op that produced this node, for graphviz / debugging / etc
+        self._prev = set(children)
+        self._op = op  # the op that produced this node, for graphviz / debugging / etc
 
-    def __add__(self, other: Union[int, float, "Value"]) -> "Value":
+    def __add__(self, other: Union[int, float, Value]) -> Value:
+        # Cast other to Value
         other = other if isinstance(other, Value) else Value(other)
-        out = Value(self.data + other.data, (self, other), "+")
 
+        # Add Values' datas
+        out = Value(data=self.data + other.data, children=(self, other), op="+")
+
+        # Backward of addition is addition
         def _backward():
             self.grad += out.grad
             other.grad += out.grad
@@ -25,10 +42,14 @@ class Value:
 
         return out
 
-    def __mul__(self, other: Union[int, float, "Value"]) -> "Value":
+    def __mul__(self, other: Union[int, float, Value]) -> Value:
+        # Cast other to Value
         other = other if isinstance(other, Value) else Value(other)
+
+        # Multiply Values' datas
         out = ...
 
+        # Backward of multiplication is ...
         def _backward():
             self.grad += ...
             other.grad += ...
@@ -37,12 +58,15 @@ class Value:
 
         return out
 
-    def __pow__(self, other: Union[int, float]) -> "Value":
+    def __pow__(self, other: Union[int, float]) -> Value:
         assert isinstance(
             other, (int, float)
         ), "only supporting int/float powers for now"
+
+        # Operate on Values' datas
         out = ...
 
+        # Backward of pow is ...
         def _backward():
             self.grad += ...
 
@@ -50,7 +74,7 @@ class Value:
 
         return out
 
-    def exp(self):
+    def exp(self) -> Value:
         out = ...
 
         def _backward():
@@ -59,7 +83,7 @@ class Value:
         out._backward = _backward
         return out
 
-    def relu(self):
+    def relu(self) -> Value:
         out = ...
 
         def _backward():
@@ -88,44 +112,45 @@ class Value:
         self.grad = 1
         for v in reversed(topo):
             # YOUR CODE GOES HERE
+            ...
 
-    def __neg__(self):  # -self
+    def __neg__(self) -> Value:  # -self
         return self * -1
 
-    def __radd__(self, other):  # other + self
+    def __radd__(self, other) -> Value:  # other + self
         return self + other
 
-    def __sub__(self, other):  # self - other
+    def __sub__(self, other) -> Value:  # self - other
         return self + (-other)
 
-    def __rsub__(self, other):  # other - self
+    def __rsub__(self, other) -> Value:  # other - self
         return other + (-self)
 
-    def __rmul__(self, other):  # other * self
+    def __rmul__(self, other) -> Value:  # other * self
         return self * other
 
-    def __truediv__(self, other):  # self / other
+    def __truediv__(self, other) -> Value:  # self / other
         return self * other ** -1
 
-    def __rtruediv__(self, other):  # other / self
+    def __rtruediv__(self, other) -> Value:  # other / self
         return other * self ** -1
 
-    def __le__(self, other):
+    def __le__(self, other) -> bool:
         if isinstance(other, Value):
             return self.data <= other.data
         return self.data <= other
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         if isinstance(other, Value):
             return self.data < other.data
         return self.data < other
 
-    def __gt__(self, other):
+    def __gt__(self, other) -> bool:
         if isinstance(other, Value):
             return self.data > other.data
         return self.data > other
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Value(data={self.data}, grad={self.grad})"
 
 
@@ -136,48 +161,55 @@ class Tensor:
     Tensor is very convenient when it comes to matrix multiplication,
     for example in Linear layers.
     """
-    def __init__(self, data):
+
+    # Tensor holds an array of Values
+    data: np.ndarray[Value]
+
+    def __init__(self, data: List[Value]):
         self.data = np.array(data)
 
-    def __add__(self, other):
+    def __add__(self, other: Union[Tensor, List[Value]]) -> Tensor:
         if isinstance(other, Tensor):
-            assert self.shape() == other.shape()
+            assert (
+                self.shape() == other.shape()
+            ), f"self.shape={self.shape}, other.shape={other.shape}"
             return Tensor(np.add(self.data, other.data))
+
         return Tensor(self.data + other)
 
-    def __mul__(self, other):
-        return ...
-    
-    def __truediv__(self, other):
-        return ...
-    
-    def __floordiv__(self, other):
-        return ...
-    
-    def __radd__(self, other):
-        return ...
-    
-    def __rmull__(self, other):
+    def __mul__(self, other: Union[Tensor, List[Value]]) -> Tensor:
         return ...
 
-    def exp(self):
+    def __truediv__(self, other: Union[Tensor, List[Value]]) -> Tensor:
         return ...
 
-    def dot(self, other):
+    def __floordiv__(self, other: Union[Tensor, List[Value]]) -> Tensor:
+        return ...
+
+    def __radd__(self, other: Union[Tensor, List[Value]]) -> Tensor:
+        return ...
+
+    def __rmull__(self, other: Union[Tensor, List[Value]]) -> Tensor:
+        return ...
+
+    def exp(self) -> Tensor:
+        return ...
+
+    def dot(self, other: Union[Tensor, List[Value]]) -> Tensor:
         if isinstance(other, Tensor):
             return ...
         return ...
 
-    def shape(self):
+    def shape(self) -> np.ndarray:
         return self.data.shape
 
-    def argmax(self, dim=None):
+    def argmax(self, dim: int = None) -> Tensor:
         return ...
 
-    def max(self, dim=None):
+    def max(self, dim: int = None) -> Tensor:
         return ...
 
-    def reshape(self, *args, **kwargs):
+    def reshape(self, *args, **kwargs) -> Tensor:
         self.data = ...
         return self
 
@@ -185,14 +217,14 @@ class Tensor:
         for value in self.data.flatten():
             value.backward()
 
-    def parameters(self):
+    def parameters(self) -> List[Value]:
         return list(self.data.flatten())
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "Tensor\n" + str(self.data)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> Value:
         return self.data[item]
 
-    def item(self):
+    def item(self) -> Value:
         return self.data.flatten()[0].data
